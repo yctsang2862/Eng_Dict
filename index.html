@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>English Dictation Master v2.0</title>
+    <title>English Dictation Master v2.2</title>
     <!-- React & React DOM UMD -->
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -846,7 +846,7 @@
                         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                             <div>
                                 <h1 className="font-bold text-lg text-indigo-600 dark:text-indigo-400 leading-none flex items-center gap-1.5">
-                                    Dictation Master <span className="text-xs bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded-full font-semibold">v2.1</span>
+                                    Dictation Master <span className="text-xs bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded-full font-semibold">v2.2</span>
                                 </h1>
                                 <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 mt-1" title="LocalStorage auto-sync active">
                                     <SaveIcon size={11}/> {saveStatus === 'saving' ? '儲存中...' : `已自動儲存 (${lastSavedTime})`}
@@ -1003,9 +1003,6 @@
                                                 >
                                                     <option value="uk-female">🇬🇧 UK Female</option>
                                                     <option value="uk-male">🇬🇧 UK Male</option>
-                                                    {voices.map(v => (
-                                                        <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>
-                                                    ))}
                                                 </select>
                                             </div>
 
