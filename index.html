@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Dictation Master v2.0</title>
+    <!-- React & React DOM UMD -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <!-- Babel Standalone for inline JSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: { 900: '#121212', 800: '#1e1e1e', 700: '#2d2d2d' },
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .blur-text { filter: blur(6px); transition: filter 0.3s ease; user-select: none; }
+        .blur-text:hover, .blur-text.unblurred { filter: blur(0px); }
+        .diff-correct { color: #10b981; font-weight: 600; background-color: rgba(16, 185, 129, 0.12); padding: 2px 6px; border-radius: 4px; }
+        .diff-missing { color: #ef4444; text-decoration: line-through; opacity: 0.85; background-color: rgba(239, 68, 68, 0.12); padding: 2px 6px; border-radius: 4px; }
+        .diff-wrong { color: #f59e0b; font-weight: 600; text-decoration: underline; background-color: rgba(245, 158, 11, 0.12); padding: 2px 6px; border-radius: 4px; }
+        @keyframes pulse-bar { 0%, 100% { height: 6px; } 50% { height: 18px; } }
+        .animate-bar { animation: pulse-bar 0.8s ease-in-out infinite; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-dark-900 dark:text-gray-100 transition-colors duration-300">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        const PlayIcon = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+        );
+
+        const SquareIcon = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            </svg>
+        );
+
+        const TrashIcon = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+        );
+
+        const MoonIcon = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+        );
+
+        const SunIcon = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="5" />
+                <line x1="12" y1="1" x2="12" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="3" y2="12" />
+                <line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+        );
+
+        const PlusIcon = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+        );
+
+        const CheckIcon = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+            </svg>
+        );
+
+        const EditIcon = ({ size = 16 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+        );
+
+        const EyeIcon = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+            </svg>
+        );
+
+        const EyeOffIcon = ({ size = 20 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+            </svg>
+        );
+
+        const SaveIcon = ({ size = 16 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+                <polyline points="7 3 7 8 15 8" />
+            </svg>
+        );
+
+        const RefreshIcon = ({ size = 16 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+        );
+
+        const DownloadIcon = ({ size = 16 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+        );
+
+        const UploadIcon = ({ size = 16 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+        );
+
+        const VolumeIcon = ({ size = 18 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+            </svg>
+        );
+
+        const DEFAULT_PASSAGES = [
+            {
+                id: 'p4_1', 
+                title: 'P4-1',
+                sentences: [
+                    { id: 's4_1_1', text: "After talking to Grandpa, Cindy asked her uncle for help." },
+                    { id: 's4_1_2', text: "For the next four weeks, Cindy ran at the park with her uncle." },
+                    { id: 's4_1_3', text: "Every day, she became fitter than the day before." },
+                    { id: 's4_1_4', text: "Finally, the day of the race arrived." },
+                    { id: 's4_1_5', text: "Cindy had a bad start and was in last place at the beginning of the race." },
+                    { id: 's4_1_6', text: "'Oh, no! I'm slower than all the others,' she thought." },
+                    { id: 's4_1_7', text: "Suddenly, she heard a familiar voice shouting, 'Run, Cindy, run!'" },
+                    { id: 's4_1_8', text: "Cindy began to run really hard." },
+                    { id: 's4_1_9', text: "She was faster than all the other runners and won the race!" },
+                    { id: 's4_1_10', text: "Grandpa was cheering and clapping his hands next to the finishing line." },
+                    { id: 's4_1_11', text: "\"Well done, Cindy!\" Grandpa hugged Cindy." },
+                    { id: 's4_1_12', text: "\"It's all thanks to you, Grandpa! I'm so happy to see you here,\" Cindy smiled." }
+                ]
+            },
+            {
+                id: 'p4_partA',
+                title: 'P4-PartA',
+                sentences: [
+                    { id: 's4_pA_1', text: "Computer Studies" },
+                    { id: 's4_pA_2', text: "General Studies" },
+                    { id: 's4_pA_3', text: "Visual Arts" },
+                    { id: 's4_pA_4', text: "interesting" },
+                    { id: 's4_pA_5', text: "Assembly" },
+                    { id: 's4_pA_6', text: "Recess" },
+                    { id: 's4_pA_7', text: "Chinese" },
+                    { id: 's4_pA_8', text: "challenging" }
+                ]
+            }
+        ];
+
+        const PUNCTUATION_MAP = {
+            '.': 'full stop',
+            ',': 'comma',
+            '?': 'question mark',
+            '!': 'exclamation mark',
+            ';': 'semicolon',
+            ':': 'colon'
+        };
+
+        const tokenizeWords = (text, speakPunct) => {
+            const tokens = [];
+            const regex = /([a-zA-Z0-9']+)|([.,!?;:])/g;
+            let match;
+            while ((match = regex.exec(text)) !== null) {
+                if (match[1]) {
+                    tokens.push({ text: match[1] });
+                } else if (match[2] && speakPunct) {
+                    const pName = PUNCTUATION_MAP[match[2]];
+                    if (pName) {
+                        tokens.push({ text: pName });
+                    }
+                }
+            }
+            return tokens;
+        };
+
+        const parseTextForSpeech = (text, speakPunctuation) => {
+            if (!speakPunctuation) {
+                return [{ phrase: text, punctWord: null, rawPunct: null }];
+            }
+            const regex = /([.,!?;:])/g;
+            const parts = text.split(regex);
+            let segments = [];
+            for (let i = 0; i < parts.length; i += 2) {
+                const phrase = parts[i].trim();
+                const punct = parts[i + 1];
+                if (phrase || punct) {
+                    segments.push({
+                        phrase,
+                        punctWord: PUNCTUATION_MAP[punct] || null,
+                        rawPunct: punct
+                    });
+                }
+            }
+            return segments;
+        };
+
+        const calculateSentencePause = (text, setting) => {
+            if (setting === 'auto') {
+                const words = (text || '').trim().split(/\s+/).filter(Boolean).length;
+                return Math.max(3, Math.ceil(words * 1.4 + 2));
+            }
+            return Number(setting) || 5;
+        };
+
+        const diffWords = (original, userInput) => {
+            const cleanWord = (w) => w.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const origWords = original.split(/\s+/).filter(Boolean);
+            const userWords = userInput.split(/\s+/).filter(Boolean);
+            
+            let result = [];
+            let uIdx = 0;
+
+            for (let i = 0; i < origWords.length; i++) {
+                const oWord = origWords[i];
+                const cleanO = cleanWord(oWord);
+                
+                let foundMatch = false;
+                let tempUIdx = uIdx;
+                
+                while (tempUIdx < userWords.length && tempUIdx < uIdx + 3) {
+                    if (cleanO === cleanWord(userWords[tempUIdx])) {
+                        foundMatch = true;
+                        break;
+                    }
+                    tempUIdx++;
+                }
+
+                if (foundMatch) {
+                    while (uIdx < tempUIdx) {
+                        result.push({ text: userWords[uIdx], status: 'wrong' });
+                        uIdx++;
+                    }
+                    result.push({ text: oWord, status: 'correct' });
+                    uIdx++;
+                } else {
+                    result.push({ text: oWord, status: 'missing' });
+                }
+            }
+            
+            while (uIdx < userWords.length) {
+                result.push({ text: userWords[uIdx], status: 'wrong' });
+                uIdx++;
+            }
+            return result;
+        };
+
+        const App = () => {
+            const [passages, setPassages] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('edm_passages_v2_2');
+                    return saved ? JSON.parse(saved) : DEFAULT_PASSAGES;
+                } catch (e) {
+                    return DEFAULT_PASSAGES;
+                }
+            });
+
+            const [userInputs, setUserInputs] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('edm_user_inputs_v2_2');
+                    return saved ? JSON.parse(saved) : {};
+                } catch (e) {
+                    return {};
+                }
+            });
+
+            const [activeId, setActiveId] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('edm_active_id_v2_2');
+                    return saved || passages[0]?.id || null;
+                } catch (e) {
+                    return passages[0]?.id || null;
+                }
+            });
+
+            // Default values according to specification:
+            // pause: auto, loops: 2x, speed: 0.6x, voice: UK Female, Punctuation: on (true)
+            const [isDarkMode, setIsDarkMode] = useState(() => {
+                try { return JSON.parse(localStorage.getItem('edm_dark_mode_v1_8') || 'false'); } catch (e) { return false; }
+            });
+            const [isBlurMode, setIsBlurMode] = useState(() => {
+                try { return JSON.parse(localStorage.getItem('edm_blur_mode_v1_8') || 'false'); } catch (e) { return false; }
+            });
+            
+            // Punctuation is permanently set to On (true) by default
+            const speakPunctuation = true;
+
+            const [loopCount, setLoopCount] = useState(() => {
+                try { return Number(localStorage.getItem('edm_loop_count_v1_8')) || 2; } catch (e) { return 2; }
+            });
+            const [pauseDuration, setPauseDuration] = useState(() => {
+                try { return localStorage.getItem('edm_pause_duration_v2_0') || 'auto'; } catch (e) { return 'auto'; }
+            });
+            const [speechRate, setSpeechRate] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('edm_speech_rate_v2_0');
+                    return saved !== null ? Number(saved) : 0.8;
+                } catch (e) { return 0.8; }
+            });
+            const [wordPause, setWordPause] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('edm_word_pause_v2_0');
+                    return saved !== null ? Number(saved) : 1;
+                } catch (e) { return 1; }
+            });
+            const [selectedVoiceGender, setSelectedVoiceGender] = useState(() => {
+                try { return localStorage.getItem('edm_voice_gender_v2_0') || 'uk-female'; } catch (e) { return 'uk-female'; }
+            });
+
+            const [voices, setVoices] = useState([]);
+            const [playingSentenceId, setPlayingSentenceId] = useState(null);
+            const [activeSentenceIndex, setActiveSentenceIndex] = useState(null);
+            const [countdown, setCountdown] = useState(null);
+            const [editingSentenceIds, setEditingSentenceIds] = useState({});
+            const [gradingResults, setGradingResults] = useState({});
+            const [showNewModal, setShowNewModal] = useState(false);
+            const [newTitle, setNewTitle] = useState('');
+            const [newContent, setNewContent] = useState('');
+            const [showImportExport, setShowImportExport] = useState(false);
+            const [deleteModalId, setDeleteModalId] = useState(null);
+
+            const isPlayingRef = useRef(false);
+            const [isPlayingAll, setIsPlayingAll] = useState(false);
+            const [isPlayingFullPassage, setIsPlayingFullPassage] = useState(false);
+            const [saveStatus, setSaveStatus] = useState('saved');
+            const [lastSavedTime, setLastSavedTime] = useState(() => new Date().toLocaleTimeString());
+
+            useEffect(() => {
+                const loadVoices = () => {
+                    if (window.speechSynthesis) {
+                        setVoices(window.speechSynthesis.getVoices());
+                    }
+                };
+                loadVoices();
+                if (window.speechSynthesis) {
+                    window.speechSynthesis.onvoiceschanged = loadVoices;
+                }
+            }, []);
+
+            useEffect(() => {
+                try {
+                    setSaveStatus('saving');
+                    localStorage.setItem('edm_passages_v2_2', JSON.stringify(passages));
+                    const now = new Date().toLocaleTimeString();
+                    const timer = setTimeout(() => {
+                        setSaveStatus('saved');
+                        setLastSavedTime(now);
+                    }, 200);
+                    return () => clearTimeout(timer);
+                } catch (e) {
+                    console.error("Auto-save error:", e);
+                }
+            }, [passages]);
+
+            useEffect(() => {
+                try {
+                    setSaveStatus('saving');
+                    localStorage.setItem('edm_user_inputs_v2_2', JSON.stringify(userInputs));
+                    const now = new Date().toLocaleTimeString();
+                    const timer = setTimeout(() => {
+                        setSaveStatus('saved');
+                        setLastSavedTime(now);
+                    }, 200);
+                    return () => clearTimeout(timer);
+                } catch (e) {
+                    console.error("Auto-save user input error:", e);
+                }
+            }, [userInputs]);
+
+            useEffect(() => {
+                try {
+                    if (activeId) localStorage.setItem('edm_active_id_v2_0', activeId);
+                    localStorage.setItem('edm_dark_mode_v2_0', JSON.stringify(isDarkMode));
+                    localStorage.setItem('edm_blur_mode_v2_0', JSON.stringify(isBlurMode));
+                    localStorage.setItem('edm_loop_count_v2_0', String(loopCount));
+                    localStorage.setItem('edm_pause_duration_v2_0', String(pauseDuration));
+                    localStorage.setItem('edm_speech_rate_v2_0', String(speechRate));
+                    localStorage.setItem('edm_word_pause_v2_0', String(wordPause));
+                    localStorage.setItem('edm_voice_gender_v2_0', selectedVoiceGender);
+                } catch (e) {
+                    console.error("Settings save error:", e);
+                }
+            }, [activeId, isDarkMode, isBlurMode, loopCount, pauseDuration, speechRate, wordPause, selectedVoiceGender]);
+            useEffect(() => {
+                if (isDarkMode) document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+            }, [isDarkMode]);
+
+            const activePassage = passages.find(p => p.id === activeId);
+            const delay = (ms) => new Promise(res => setTimeout(res, ms));
+
+            const getSelectedVoice = () => {
+                const available = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+                if (!available || available.length === 0) return null;
+
+                const ukVoices = available.filter(v => v.lang && v.lang.replace('_', '-').toLowerCase().startsWith('en-gb'));
+                const candidates = ukVoices.length > 0 ? ukVoices : available.filter(v => v.lang && v.lang.toLowerCase().startsWith('en'));
+
+                if (selectedVoiceGender === 'uk-female') {
+                    const female = candidates.find(v => {
+                        const n = (v.name || '').toLowerCase();
+                        return n.includes('female') || n.includes('hazel') || n.includes('sonia') || n.includes('serena') || n.includes('kate') || n.includes('martha') || n.includes('victoria') || n.includes('susan') || n.includes('fiona') || n.includes('libby');
+                    });
+                    if (female) return female;
+                } else if (selectedVoiceGender === 'uk-male') {
+                    const male = candidates.find(v => {
+                        const n = (v.name || '').toLowerCase();
+                        return n.includes('male') || n.includes('george') || n.includes('ryan') || n.includes('daniel') || n.includes('oliver') || n.includes('arthur') || n.includes('thomas');
+                    });
+                    if (male) return male;
+                }
+
+                const specificVoice = available.find(v => v.voiceURI === selectedVoiceGender || v.name === selectedVoiceGender);
+                if (specificVoice) return specificVoice;
+
+                return candidates[0] || available[0] || null;
+            };
+
+            const speakText = async (text, voice) => {
+                return new Promise((resolve) => {
+                    if (!text || !text.trim() || !isPlayingRef.current) {
+                        resolve();
+                        return;
+                    }
+
+                    if (window.speechSynthesis && window.speechSynthesis.paused) {
+                        window.speechSynthesis.resume();
+                    }
+
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    if (voice) utterance.voice = voice;
+                    utterance.rate = speechRate;
+
+                    utterance.onend = () => resolve();
+                    utterance.onerror = (e) => {
+                        // "interrupted" or "canceled" are standard events when stopping speech
+                        if (e.error !== 'interrupted' && e.error !== 'canceled') {
+                            console.warn("Speech synthesis note:", e.error || 'Playback stopped');
+                        }
+                        resolve();
+                    };
+
+                    try {
+                        window.speechSynthesis.speak(utterance);
+                    } catch (err) {
+                        console.warn("Speech synthesis speak call error:", err);
+                        resolve();
+                    }
+                });
+            };
+
+            const playSingleSentence = async (sentence, loops, pauseSetting) => {
+                setPlayingSentenceId(sentence.id);
+                setCountdown(null);
+
+                const voice = getSelectedVoice();
+                const actualPauseTime = calculateSentencePause(sentence.text, pauseSetting);
+
+                try {
+                    for (let loop = 0; loop < loops; loop++) {
+                        if (!isPlayingRef.current) break;
+
+                        if (wordPause > 0) {
+                            const tokens = tokenizeWords(sentence.text, speakPunctuation);
+                            for (let k = 0; k < tokens.length; k++) {
+                                if (!isPlayingRef.current) break;
+                                await speakText(tokens[k].text, voice);
+                                if (!isPlayingRef.current) break;
+                                if (k < tokens.length - 1) {
+                                    await delay(wordPause * 1000);
+                                }
+                            }
+                        } else {
+                            const segments = parseTextForSpeech(sentence.text, speakPunctuation);
+                            for (const seg of segments) {
+                                if (!isPlayingRef.current) break;
+                                if (seg.phrase) {
+                                    await speakText(seg.phrase, voice);
+                                }
+                                if (!isPlayingRef.current) break;
+                                if (seg.punctWord) {
+                                    await speakText(seg.punctWord, voice);
+                                    if (!isPlayingRef.current) break;
+                                    await delay(800);
+                                }
+                            }
+                        }
+
+                        if (!isPlayingRef.current) break;
+
+                        if (loop < loops - 1) {
+                            let remainingTime = actualPauseTime;
+                            while (remainingTime > 0 && isPlayingRef.current) {
+                                setCountdown(remainingTime);
+                                await delay(1000);
+                                remainingTime--;
+                            }
+                            setCountdown(null);
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Playback interrupted or stopped.");
+                }
+            };
+
+            const playDictation = async (sentence, loops = loopCount) => {
+                if (isPlayingRef.current) stopDictation();
+                isPlayingRef.current = true;
+                setIsPlayingAll(false);
+                
+                await playSingleSentence(sentence, loops, pauseDuration);
+
+                isPlayingRef.current = false;
+                setPlayingSentenceId(null);
+                setCountdown(null);
+            };
+
+            const playAllDictation = async () => {
+                if (!activePassage || activePassage.sentences.length === 0) return;
+                if (isPlayingRef.current) stopDictation();
+
+                isPlayingRef.current = true;
+                setIsPlayingAll(true);
+
+                for (let i = 0; i < activePassage.sentences.length; i++) {
+                    if (!isPlayingRef.current) break;
+                    const sentence = activePassage.sentences[i];
+                    setActiveSentenceIndex(i + 1);
+                    
+                    await playSingleSentence(sentence, loopCount, pauseDuration);
+
+                    if (i < activePassage.sentences.length - 1 && isPlayingRef.current) {
+                        let remaining = calculateSentencePause(sentence.text, pauseDuration);
+                        while (remaining > 0 && isPlayingRef.current) {
+                            setCountdown(remaining);
+                            await delay(1000);
+                            remaining--;
+                        }
+                        setCountdown(null);
+                    }
+                }
+
+                isPlayingRef.current = false;
+                setIsPlayingAll(false);
+                setPlayingSentenceId(null);
+                setActiveSentenceIndex(null);
+                setCountdown(null);
+            };
+
+            const playFullPassage = async () => {
+                if (!activePassage || activePassage.sentences.length === 0) return;
+                if (isPlayingRef.current) stopDictation();
+
+                isPlayingRef.current = true;
+                setIsPlayingFullPassage(true);
+
+                const voice = getSelectedVoice();
+
+                try {
+                    for (let i = 0; i < activePassage.sentences.length; i++) {
+                        if (!isPlayingRef.current) break;
+                        const sentence = activePassage.sentences[i];
+                        setPlayingSentenceId(sentence.id);
+                        setActiveSentenceIndex(i + 1);
+
+                        if (wordPause > 0) {
+                            const tokens = tokenizeWords(sentence.text, speakPunctuation);
+                            for (let k = 0; k < tokens.length; k++) {
+                                if (!isPlayingRef.current) break;
+                                await speakText(tokens[k].text, voice);
+                                if (!isPlayingRef.current) break;
+                                if (k < tokens.length - 1) {
+                                    await delay(wordPause * 1000);
+                                }
+                            }
+                        } else {
+                            const segments = parseTextForSpeech(sentence.text, speakPunctuation);
+                            for (const seg of segments) {
+                                if (!isPlayingRef.current) break;
+                                if (seg.phrase) {
+                                    await speakText(seg.phrase, voice);
+                                }
+                                if (!isPlayingRef.current) break;
+                                if (seg.punctWord) {
+                                    await speakText(seg.punctWord, voice);
+                                    if (!isPlayingRef.current) break;
+                                    await delay(800);
+                                }
+                            }
+                        }
+
+                        if (i < activePassage.sentences.length - 1 && isPlayingRef.current) {
+                            await delay(2000);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Full passage speech error:", e);
+                }
+
+                isPlayingRef.current = false;
+                setIsPlayingFullPassage(false);
+                setPlayingSentenceId(null);
+                setActiveSentenceIndex(null);
+            };
+
+            const stopDictation = () => {
+                isPlayingRef.current = false;
+                if (window.speechSynthesis) window.speechSynthesis.cancel();
+                setIsPlayingAll(false);
+                setIsPlayingFullPassage(false);
+                setPlayingSentenceId(null);
+                setActiveSentenceIndex(null);
+                setCountdown(null);
+            };
+
+            const handleCreatePassage = () => {
+                if (!newTitle.trim() || !newContent.trim()) return;
+                
+                const rawSentences = newContent
+                    .split(/(?<=[.!?])\s+|\n+/)
+                    .map(s => s.trim())
+                    .filter(Boolean);
+
+                const newPassage = {
+                    id: 'p' + Date.now(),
+                    title: newTitle.trim(),
+                    sentences: rawSentences.map((st, idx) => ({
+                        id: `s_${Date.now()}_${idx}`,
+                        text: st
+                    }))
+                };
+
+                const updated = [...passages, newPassage];
+                setPassages(updated);
+                setActiveId(newPassage.id);
+                setNewTitle('');
+                setNewContent('');
+                setShowNewModal(false);
+            };
+
+            const confirmDeletePassage = () => {
+                if (!deleteModalId) return;
+                const updated = passages.filter(p => p.id !== deleteModalId);
+                setPassages(updated);
+                if (activeId === deleteModalId) {
+                    setActiveId(updated.length > 0 ? updated[0].id : null);
+                }
+                setDeleteModalId(null);
+            };
+
+            const updatePassage = (updatedPassage) => {
+                setPassages(prev => prev.map(p => p.id === updatedPassage.id ? updatedPassage : p));
+            };
+
+            const toggleEditSentence = (sentenceId) => {
+                setEditingSentenceIds(prev => ({
+                    ...prev,
+                    [sentenceId]: !prev[sentenceId]
+                }));
+            };
+
+            const handleTextEdit = (sentenceId, newText) => {
+                if (!activePassage) return;
+                const updatedSentences = activePassage.sentences.map(s => 
+                    s.id === sentenceId ? { ...s, text: newText } : s
+                );
+                updatePassage({ ...activePassage, sentences: updatedSentences });
+            };
+
+            const handleInputChange = (sentenceId, value) => {
+                setUserInputs(prev => ({ ...prev, [sentenceId]: value }));
+                if (gradingResults[sentenceId]) {
+                    setGradingResults(prev => {
+                        const newRes = {...prev};
+                        delete newRes[sentenceId];
+                        return newRes;
+                    });
+                }
+            };
+
+            const insertPunctuation = (sentenceId, char) => {
+                const current = userInputs[sentenceId] || '';
+                handleInputChange(sentenceId, current + char);
+            };
+
+            const handleGrade = (sentence) => {
+                const input = userInputs[sentence.id] || "";
+                const diff = diffWords(sentence.text, input);
+                setGradingResults(prev => ({ ...prev, [sentence.id]: diff }));
+            };
+
+            const handleGradeAll = () => {
+                if (!activePassage) return;
+                const newResults = {};
+                activePassage.sentences.forEach(s => {
+                    newResults[s.id] = diffWords(s.text, userInputs[s.id] || "");
+                });
+                setGradingResults(newResults);
+            };
+
+            const handleResetPassage = () => {
+                if (!activePassage) return;
+                const updatedInputs = { ...userInputs };
+                activePassage.sentences.forEach(s => {
+                    delete updatedInputs[s.id];
+                });
+                setUserInputs(updatedInputs);
+                setGradingResults({});
+            };
+
+            const addNewSentence = () => {
+                if (!activePassage) return;
+                const newId = 's' + Date.now();
+                const newSentences = [...activePassage.sentences, { id: newId, text: "New sentence text." }];
+                updatePassage({ ...activePassage, sentences: newSentences });
+                setEditingSentenceIds(prev => ({ ...prev, [newId]: true }));
+            };
+
+            const deleteSentence = (sentenceId) => {
+                 if (!activePassage) return;
+                 const newSentences = activePassage.sentences.filter(s => s.id !== sentenceId);
+                 updatePassage({ ...activePassage, sentences: newSentences });
+            };
+
+            const exportPassagesJSON = () => {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(passages, null, 2));
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.setAttribute("href", dataStr);
+                downloadAnchor.setAttribute("download", `Dictation_Master_Backup_${new Date().toISOString().slice(0, 10)}.json`);
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+            };
+
+            const importPassagesJSON = (event) => {
+                const fileReader = new FileReader();
+                if (event.target.files && event.target.files[0]) {
+                    fileReader.readAsText(event.target.files[0], "UTF-8");
+                    fileReader.onload = (e) => {
+                        try {
+                            const imported = JSON.parse(e.target.result);
+                            if (Array.isArray(imported)) {
+                                setPassages(imported);
+                                if (imported.length > 0) setActiveId(imported[0].id);
+                                setShowImportExport(false);
+                            }
+                        } catch (err) {
+                            alert("Invalid JSON format file.");
+                        }
+                    };
+                }
+            };
+
+            const getAccuracyMetrics = () => {
+                if (!activePassage) return null;
+                let totalWords = 0;
+                let correctCount = 0;
+                let wrongCount = 0;
+                let missingCount = 0;
+                let scoredSentences = 0;
+
+                activePassage.sentences.forEach(s => {
+                    const diff = gradingResults[s.id];
+                    if (diff) {
+                        scoredSentences++;
+                        diff.forEach(item => {
+                            if (item.status === 'correct') { correctCount++; totalWords++; }
+                            else if (item.status === 'wrong') { wrongCount++; }
+                            else if (item.status === 'missing') { missingCount++; totalWords++; }
+                        });
+                    }
+                });
+
+                if (scoredSentences === 0) return null;
+                const accuracy = totalWords > 0 ? Math.round((correctCount / totalWords) * 100) : 0;
+                return { accuracy, totalWords, correctCount, wrongCount, missingCount, scoredSentences };
+            };
+
+            const metrics = getAccuracyMetrics();
+
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    {/* Sidebar Navigation */}
+                    <div className="w-64 bg-white dark:bg-dark-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-colors">
+                        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                            <div>
+                                <h1 className="font-bold text-lg text-indigo-600 dark:text-indigo-400 leading-none flex items-center gap-1.5">
+                                    Dictation Master <span className="text-xs bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded-full font-semibold">v2.0</span>
+                                </h1>
+                                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 mt-1" title="LocalStorage auto-sync active">
+                                    <SaveIcon size={11}/> {saveStatus === 'saving' ? '儲存中...' : `已自動儲存 (${lastSavedTime})`}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <button 
+                                    onClick={() => setShowImportExport(true)}
+                                    className="p-1.5 rounded-lg text-gray-500 hover:text-indigo-600 hover:bg-gray-100 dark:hover:bg-dark-700"
+                                    title="Backup / Restore"
+                                >
+                                    <DownloadIcon size={16}/>
+                                </button>
+                                <button 
+                                    onClick={() => setIsDarkMode(!isDarkMode)}
+                                    className="p-1.5 rounded-lg text-gray-500 hover:text-indigo-600 hover:bg-gray-100 dark:hover:bg-dark-700"
+                                    title="Toggle Dark Mode"
+                                >
+                                    {isDarkMode ? <SunIcon size={16}/> : <MoonIcon size={16}/>}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-3 border-b border-gray-100 dark:border-gray-700/50">
+                            <button 
+                                onClick={() => setShowNewModal(true)}
+                                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-3 rounded-lg text-xs transition-colors shadow-sm"
+                            >
+                                <PlusIcon size={16}/> New Passage
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                            {passages.map(p => (
+                                <div 
+                                    key={p.id}
+                                    onClick={() => setActiveId(p.id)}
+                                    className={`group flex items-center justify-between p-2.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                                        activeId === p.id 
+                                            ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800' 
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700'
+                                    }`}
+                                >
+                                    <span className="truncate pr-2">{p.title}</span>
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); setDeleteModalId(p.id); }}
+                                        className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500 rounded"
+                                    >
+                                        <TrashIcon size={14}/>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Main Content Workspace */}
+                    <div className="flex-1 flex flex-col bg-gray-50 dark:bg-dark-900 overflow-hidden">
+                        {activePassage ? (
+                            <>
+                                {/* Global Dictation Controls Header */}
+                                <div className="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-gray-700 p-4 shadow-sm">
+                                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                                        <div>
+                                            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">{activePassage.title}</h2>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                {activePassage.sentences.length} Sentences
+                                            </p>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            {/* Start Dictation Button (RED) */}
+                                            {isPlayingAll ? (
+                                                <button 
+                                                    onClick={stopDictation}
+                                                    className="flex items-center gap-1.5 bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-md transition-all animate-pulse"
+                                                >
+                                                    <SquareIcon size={14} /> Stop
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    onClick={playAllDictation}
+                                                    className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-md transition-all transform active:scale-95"
+                                                    title="Play all sentences continuously"
+                                                >
+                                                    <PlayIcon size={14} /> Start
+                                                </button>
+                                            )}
+
+                                            {/* Voice Selection Dropdown */}
+                                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-dark-700 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600">
+                                                <span className="text-xs font-semibold text-gray-500">Voice:</span>
+                                                <select 
+                                                    value={selectedVoiceGender}
+                                                    onChange={(e) => setSelectedVoiceGender(e.target.value)}
+                                                    className="bg-transparent text-xs font-medium text-gray-800 dark:text-gray-200 focus:outline-none"
+                                                >
+                                                    <option value="uk-female">🇬🇧 UK Female</option>
+                                                    <option value="uk-male">🇬🇧 UK Male</option>
+                                                    {voices.map(v => (
+                                                        <option key={v.voiceURI} value={v.voiceURI}>{v.name} ({v.lang})</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* Speed Dropdown */}
+                                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-dark-700 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600">
+                                                <span className="text-xs font-semibold text-gray-500">Speed:</span>
+                                                <select 
+                                                    value={speechRate}
+                                                    onChange={(e) => setSpeechRate(Number(e.target.value))}
+                                                    className="bg-transparent text-xs font-medium text-gray-800 dark:text-gray-200 focus:outline-none"
+                                                >
+                                                    <option value={0.6}>0.6x</option>
+                                                    <option value={0.8}>0.8x</option>
+                                                    <option value={1.0}>1.0x</option>
+                                                    <option value={1.2}>1.2x</option>
+                                                </select>
+                                            </div>
+
+                                            {/* Pause Dropdown */}
+                                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-dark-700 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600">
+                                                <span className="text-xs font-semibold text-gray-500">Pause:</span>
+                                                <select 
+                                                    value={pauseDuration}
+                                                    onChange={(e) => setPauseDuration(e.target.value)}
+                                                    className="bg-transparent text-xs font-medium text-gray-800 dark:text-gray-200 focus:outline-none"
+                                                >
+                                                    <option value="auto">⚡ Auto (Length)</option>
+                                                    <option value="3">3s</option>
+                                                    <option value="5">5s</option>
+                                                    <option value="8">8s</option>
+                                                    <option value="10">10s</option>
+                                                    <option value="12">12s</option>
+                                                    <option value="15">15s</option>
+                                                </select>
+                                            </div>
+
+                                            {/* Word Pause Dropdown */}
+                                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-dark-700 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600">
+                                                <span className="text-xs font-semibold text-gray-500">Word Pause:</span>
+                                                <select 
+                                                    value={wordPause}
+                                                    onChange={(e) => setWordPause(Number(e.target.value))}
+                                                    className="bg-transparent text-xs font-medium text-gray-800 dark:text-gray-200 focus:outline-none"
+                                                >
+                                                    <option value={0}>Off (Normal)</option>
+                                                    <option value={1}>1s</option>
+                                                    <option value={2}>2s</option>
+                                                    <option value={3}>3s</option>
+                                                    <option value={4}>4s</option>
+                                                    <option value={5}>5s</option>
+                                                </select>
+                                            </div>
+
+                                            {/* Loops Dropdown */}
+                                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-dark-700 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600">
+                                                <span className="text-xs font-semibold text-gray-500">Loops:</span>
+                                                <select 
+                                                    value={loopCount}
+                                                    onChange={(e) => setLoopCount(Number(e.target.value))}
+                                                    className="bg-transparent text-xs font-medium text-gray-800 dark:text-gray-200 focus:outline-none"
+                                                >
+                                                    <option value={1}>1x</option>
+                                                    <option value={2}>2x</option>
+                                                    <option value={3}>3x</option>
+                                                    <option value={4}>4x</option>
+                                                    <option value={5}>5x</option>
+                                                </select>
+                                            </div>
+
+                                            {/* Memory Blur Mode */}
+                                            <button 
+                                                onClick={() => setIsBlurMode(!isBlurMode)}
+                                                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
+                                                    isBlurMode 
+                                                        ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700' 
+                                                        : 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-dark-700 dark:text-gray-300 dark:border-gray-600'
+                                                }`}
+                                            >
+                                                {isBlurMode ? <EyeOffIcon size={15}/> : <EyeIcon size={15}/>}
+                                                <span>Blur Mode</span>
+                                            </button>
+
+                                            {/* Grade All */}
+                                            <button 
+                                                onClick={handleGradeAll}
+                                                className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-colors"
+                                            >
+                                                <CheckIcon size={15}/> Grade All
+                                            </button>
+
+                                            {/* Reset Answers */}
+                                            <button 
+                                                onClick={handleResetPassage}
+                                                className="flex items-center gap-1 bg-gray-200 hover:bg-gray-300 dark:bg-dark-700 dark:hover:bg-dark-600 text-gray-700 dark:text-gray-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                                                title="Clear typed dictation answers"
+                                            >
+                                                <RefreshIcon size={14}/> Reset
+                                            </button>
+
+                                            {/* Audiobook Button */}
+                                            {isPlayingFullPassage ? (
+                                                <button 
+                                                    onClick={stopDictation}
+                                                    className="flex items-center gap-1 bg-teal-700 hover:bg-teal-800 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-colors"
+                                                >
+                                                    <SquareIcon size={15}/> Stop Audiobook
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    onClick={playFullPassage}
+                                                    className="flex items-center gap-1 bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-colors"
+                                                    title="Read full continuous passage with 2s pause"
+                                                >
+                                                    <PlayIcon size={15}/> Audiobook
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Score & Accuracy Dashboard */}
+                                {metrics && (
+                                    <div className="mx-6 mt-4 p-4 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 text-white shadow-md flex flex-wrap items-center justify-between gap-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center font-extrabold text-2xl border border-white/30">
+                                                {metrics.accuracy}%
+                                            </div>
+                                            <div>
+                                                <div className="text-xs uppercase tracking-wider font-semibold text-indigo-100">Overall Passage Score</div>
+                                                <div className="text-lg font-bold">
+                                                    {metrics.accuracy >= 90 ? '🌟 Outstanding Master!' : metrics.accuracy >= 75 ? '👍 Great Job!' : '💪 Keep Practicing!'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-4 text-xs font-medium bg-black/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/10">
+                                            <div><span className="block text-gray-300 text-[10px]">Total Words</span><span className="text-sm font-bold">{metrics.totalWords}</span></div>
+                                            <div className="w-px bg-white/20"></div>
+                                            <div><span className="block text-emerald-300 text-[10px]">Correct</span><span className="text-sm font-bold text-emerald-300">{metrics.correctCount}</span></div>
+                                            <div className="w-px bg-white/20"></div>
+                                            <div><span className="block text-amber-300 text-[10px]">Wrong</span><span className="text-sm font-bold text-amber-300">{metrics.wrongCount}</span></div>
+                                            <div className="w-px bg-white/20"></div>
+                                            <div><span className="block text-rose-300 text-[10px]">Missing</span><span className="text-sm font-bold text-rose-300">{metrics.missingCount}</span></div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Sentences List Workspace */}
+                                <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                                    {activePassage.sentences.map((sentence, idx) => {
+                                        const isPlaying = playingSentenceId === sentence.id;
+                                        const diffResult = gradingResults[sentence.id];
+                                        const computedPause = calculateSentencePause(sentence.text, pauseDuration);
+
+                                        return (
+                                            <div 
+                                                key={sentence.id}
+                                                className={`p-5 rounded-xl border transition-all duration-200 bg-white dark:bg-dark-800 shadow-sm ${
+                                                    isPlaying ? 'ring-2 ring-indigo-500 border-indigo-300 dark:border-indigo-700' : 'border-gray-200 dark:border-gray-700'
+                                                }`}
+                                            >
+                                                <div className="flex justify-between items-start mb-3 gap-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 px-2.5 py-1 rounded-md">
+                                                            Sentence {idx + 1}
+                                                        </span>
+                                                        <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-dark-700 px-2 py-0.5 rounded" title="Calculated pause based on length">
+                                                            ⏱️️ Pause: {computedPause}s
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button 
+                                                            onClick={() => toggleEditSentence(sentence.id)}
+                                                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                                                editingSentenceIds[sentence.id] 
+                                                                    ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm' 
+                                                                    : 'bg-gray-100 hover:bg-gray-200 dark:bg-dark-700 dark:hover:bg-dark-600 text-gray-700 dark:text-gray-300'
+                                                            }`}
+                                                            title={editingSentenceIds[sentence.id] ? "Done Editing" : "Edit Sentence"}
+                                                        >
+                                                            {editingSentenceIds[sentence.id] ? (
+                                                                <>
+                                                                    <CheckIcon size={14} />
+                                                                    <span>Save</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <EditIcon size={14} />
+                                                                    <span>Edit</span>
+                                                                </>
+                                                            )}
+                                                        </button>
+                                                        {isPlaying ? (
+                                                            <button onClick={stopDictation} className="flex items-center gap-1 bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-600">
+                                                                <SquareIcon size={14} /> Stop
+                                                            </button>
+                                                        ) : (
+                                                            <button onClick={() => playDictation(sentence, loopCount)} className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-indigo-700 shadow-sm">
+                                                                <PlayIcon size={14} /> Listen
+                                                            </button>
+                                                        )}
+                                                        <button onClick={() => deleteSentence(sentence.id)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-700" title="Delete">
+                                                            <TrashIcon size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Sentence Text / Edit Mode */}
+                                                <div className="mb-4 relative">
+                                                    {editingSentenceIds[sentence.id] ? (
+                                                        <div className="space-y-1">
+                                                            <textarea 
+                                                                value={sentence.text}
+                                                                onChange={(e) => handleTextEdit(sentence.id, e.target.value)}
+                                                                placeholder="Enter sentence text..."
+                                                                className="w-full p-2.5 text-base font-medium bg-gray-50 dark:bg-dark-700 border border-indigo-400 dark:border-indigo-500 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none resize-y"
+                                                                rows={2}
+                                                                autoFocus
+                                                            />
+                                                            <div className="flex justify-between items-center text-[10px] text-gray-400">
+                                                                <span className="italic">Auto-saves as you type</span>
+                                                                <button onClick={() => toggleEditSentence(sentence.id)} className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline">
+                                                                    Done
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div 
+                                                            onClick={() => toggleEditSentence(sentence.id)}
+                                                            className={`text-lg font-medium py-2 px-1 rounded-lg hover:bg-gray-50 dark:hover:bg-dark-700/50 cursor-pointer border-b border-dashed border-gray-200 dark:border-gray-700 transition-colors ${isBlurMode ? 'blur-text' : ''}`}
+                                                            title="Click to edit sentence text"
+                                                        >
+                                                            {sentence.text || <span className="text-gray-400 italic">Click Edit to modify...</span>}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Dictation Input & Soft Punctuation Keyboard */}
+                                                <div className="space-y-2 pt-1">
+                                                    <textarea 
+                                                        value={userInputs[sentence.id] || ''}
+                                                        onChange={(e) => handleInputChange(sentence.id, e.target.value)}
+                                                        placeholder="Type what you hear..."
+                                                        className="w-full p-3 text-sm bg-gray-50 dark:bg-dark-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                                        rows={2}
+                                                    />
+
+                                                    {/* Quick Soft Punctuation Toolbar */}
+                                                    <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-[11px] font-semibold text-gray-400 mr-1">Insert:</span>
+                                                            {['.', ',', '?', '!', ';', ':', "'", '"', '-'].map(symbol => (
+                                                                <button
+                                                                    key={symbol}
+                                                                    onClick={() => insertPunctuation(sentence.id, symbol)}
+                                                                    className="px-2 py-0.5 text-xs font-bold bg-gray-100 hover:bg-gray-200 dark:bg-dark-700 dark:hover:bg-dark-600 text-gray-700 dark:text-gray-200 rounded border border-gray-200 dark:border-gray-600 transition-colors"
+                                                                >
+                                                                    {symbol}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+
+                                                        <button 
+                                                            onClick={() => handleGrade(sentence)}
+                                                            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                                                        >
+                                                            <CheckIcon size={13}/> Check Sentence
+                                                        </button>
+                                                    </div>
+
+                                                    {isPlaying && countdown !== null && (
+                                                        <div className="mt-2 text-xs font-bold text-amber-600 dark:text-amber-400 animate-pulse bg-amber-50 dark:bg-amber-900/30 px-3 py-1.5 rounded-md border border-amber-200 dark:border-amber-800 inline-block">
+                                                            Pause for typing: {countdown}s ({pauseDuration === 'auto' ? 'Auto length' : 'Fixed pause'})
+                                                        </div>
+                                                    )}
+
+                                                    {/* Sentence Diff Grading Result */}
+                                                    {diffResult && (
+                                                        <div className="mt-3 p-3.5 bg-gray-100 dark:bg-dark-700/80 rounded-lg text-sm flex flex-wrap gap-1.5 leading-relaxed border border-gray-200 dark:border-gray-600">
+                                                            {diffResult.map((w, wIdx) => {
+                                                                if (w.status === 'correct') return <span key={wIdx} className="diff-correct">{w.text}</span>;
+                                                                if (w.status === 'missing') return <span key={wIdx} className="diff-missing">{w.text}</span>;
+                                                                return <span key={wIdx} className="diff-wrong">{w.text}</span>;
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+
+                                    <button 
+                                        onClick={addNewSentence}
+                                        className="w-full py-3 border-2 border-dashed border-gray-300 dark:border-gray-700 text-gray-500 hover:text-indigo-600 hover:border-indigo-400 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <PlusIcon size={16}/> Add Sentence
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-8">
+                                <p className="mb-4 text-lg">No passages available.</p>
+                                <button onClick={() => setShowNewModal(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium">
+                                    Create First Passage
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Modal: New Passage */}
+                    {showNewModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                            <div className="bg-white dark:bg-dark-800 rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-gray-200 dark:border-gray-700">
+                                <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Add New Passage</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Title</label>
+                                        <input 
+                                            value={newTitle}
+                                            onChange={(e) => setNewTitle(e.target.value)}
+                                            placeholder="e.g. Chapter 1 Dictation"
+                                            className="w-full p-2.5 bg-gray-50 dark:bg-dark-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm outline-none focus:border-indigo-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">English Passage Text</label>
+                                        <textarea 
+                                            value={newContent}
+                                            onChange={(e) => setNewContent(e.target.value)}
+                                            placeholder="Paste full passage text here..."
+                                            rows={6}
+                                            className="w-full p-2.5 bg-gray-50 dark:bg-dark-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm outline-none focus:border-indigo-500 resize-none"
+                                        />
+                                        <p className="text-xs text-gray-400 mt-1">Text will automatically split into individual dictation sentence cards.</p>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setShowNewModal(false)} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-lg">Cancel</button>
+                                    <button onClick={handleCreatePassage} className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm">Save Passage</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Modal: Backup & Restore */}
+                    {showImportExport && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                            <div className="bg-white dark:bg-dark-800 rounded-2xl p-6 max-w-md w-full shadow-2xl border border-gray-200 dark:border-gray-700">
+                                <h3 className="text-lg font-bold mb-2 text-gray-900 dark:text-white flex items-center gap-2">
+                                    <DownloadIcon size={18}/> Backup & Restore Passages
+                                </h3>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-6">
+                                    Export your custom passages to share with students, or restore from a JSON backup file.
+                                </p>
+                                <div className="space-y-3">
+                                    <button 
+                                        onClick={exportPassagesJSON}
+                                        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-xl font-semibold text-sm transition-colors shadow-sm"
+                                    >
+                                        <DownloadIcon size={16}/> Export Passages (.json)
+                                    </button>
+                                    
+                                    <label className="w-full flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 dark:bg-dark-700 dark:hover:bg-dark-600 text-gray-800 dark:text-gray-200 p-3 rounded-xl font-semibold text-sm transition-colors cursor-pointer border border-gray-200 dark:border-gray-600">
+                                        <UploadIcon size={16}/> Import Passages (.json)
+                                        <input type="file" accept=".json" onChange={importPassagesJSON} className="hidden" />
+                                    </label>
+                                </div>
+                                <div className="mt-6 text-right">
+                                    <button onClick={() => setShowImportExport(false)} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700 rounded-lg">
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Modal: Confirm Delete */}
+                    {deleteModalId && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                            <div className="bg-white dark:bg-dark-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-gray-200 dark:border-gray-700 text-center">
+                                <h3 className="text-lg font-bold mb-2 text-gray-900 dark:text-white">Delete Passage?</h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Are you sure you want to permanently remove this passage and its contents?</p>
+                                <div className="flex justify-center gap-3">
+                                    <button onClick={() => setDeleteModalId(null)} className="px-4 py-2 text-sm font-medium bg-gray-100 dark:bg-dark-700 text-gray-700 dark:text-gray-300 rounded-lg">Cancel</button>
+                                    <button onClick={confirmDeletePassage} className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-sm">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
